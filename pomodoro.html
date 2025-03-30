@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可爱番茄钟</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff5f5;
+            color: #e53e3e;
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(229, 62, 62, 0.1);
+            position: relative;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .tomato {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .timer {
+            font-size: 4.5rem;
+            font-weight: 200;
+            margin: 1rem 0;
+            color: #e53e3e;
+            text-shadow: 2px 2px 4px rgba(229, 62, 62, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+
+        .controls button {
+            background: #fed7d7;
+            border: none;
+            color: #e53e3e;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            border-radius: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(229, 62, 62, 0.1);
+        }
+
+        .controls button:hover {
+            background: #feb2b2;
+            transform: translateY(-2px);
+        }
+
+        .status {
+            font-size: 1.2rem;
+            margin-top: 1rem;
+            color: #e53e3e;
+        }
+
+        .stats {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #fc8181;
+        }
+
+        .time-settings {
+            margin: 1rem 0;
+        }
+
+        select {
+            padding: 0.5rem;
+            border: 2px solid #fed7d7;
+            border-radius: 0.5rem;
+            background: white;
+            color: #e53e3e;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:focus {
+            border-color: #fc8181;
+        }
+
+        @media (max-width: 480px) {
+            .timer {
+                font-size: 3.5rem;
+            }
+            .container {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tomato">🍅</div>
+        <div class="time-settings">
+            <select id="timeSelect">
+                <option value="25">25 分钟</option>
+                <option value="30">30 分钟</option>
+                <option value="45">45 分钟</option>
+                <option value="60">60 分钟</option>
+            </select>
+        </div>
+        <div class="timer">25:00</div>
+        <div class="controls">
+            <button id="startBtn">开始</button>
+            <button id="resetBtn">重置</button>
+        </div>
+        <div class="status">准备开始</div>
+        <div class="stats">今日完成：0 个番茄钟</div>
+    </div>
+
+    <script>
+        const timer = document.querySelector('.timer');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const status = document.querySelector('.status');
+        const stats = document.querySelector('.stats');
+        const timeSelect = document.getElementById('timeSelect');
+
+        let timeLeft = 25 * 60;
+        let timerId = null;
+        let isBreak = false;
+        let completedPomodoros = 0;
+
+        timeSelect.addEventListener('change', function() {
+            if (timerId === null) {
+                const selectedMinutes = parseInt(this.value);
+                timeLeft = selectedMinutes * 60;
+                updateDisplay();
+            }
+        });
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.title = `${timer.textContent} - 可爱番茄钟`;
+        }
+
+        function playSound() {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZRA0PVqzn77BdGAg+ltryxnMpBSl+zPLaizsIGGS57OihUBELTKXh8bllHgU2jdXzzn0vBSF1xe/glEILElyx6OyrWBUIQ5zd8sFuJAUuhM/z1YU2Bhxqvu7mnEYODlOq5O+zYBoGPJPY88p2KwUme8rx3I4+CRZiturqpVITC0mi4PK8aB8GM4nU8tGAMQYfcsLu45ZFDBFYr+ftrVoXCECY3PLEcSYELIHO8diJOQcZaLvt559NEAxPqOPwtmMcBjiP1/PMeS0GI3fH8N2RQAoUXrTp66hVFApGnt/yvmwhBTCG0fPTgjQGHW/A7eSaRQ0PVqzl77BeGQc+ltrzxnUoBSh+zPDaizsIGGS56+mjTxELTKXh8bllHgU1jdT0z3wvBSJ1xe/glEILElyx6OyrWRUIRJve8sFuJAUug8/y1oU2Bhxqvu7mnEYODlOq5O+zYRsGPJPY88p3KgUme8rx3I4+CRVht+rqpVMSC0mh4PK8aiAFM4nU8tGAMQYfccPu45ZFDBFYr+ftrVwWCECY3PLEcSYGK4DN8tiIOQcZZ7zs56BODwxPqOPxtmQcBjiP1/PMeS0GI3fH8N+RQAoUXrTp66hWEwlGnt/yv2wiBDCG0fPTgzQGHm/A7eSaSw0PVqzl77BeGQc9ltvyxnUoBSh+zPDaizsIGGS56+mjUREKTKPi8blnHgU1jdTy0HwvBSJ1xe/glEQKElyx6OyrWRUIRJzd8sFuJAUug8/y1oU3BRxqvu7mnEgNDVKq5O+zYRsGOpPZ88p3KgUmfMrx3I4+CRVht+rqpVMSC0mh4PK8aiAFM4nU8tGAMwUfccPu45ZFDBFYr+ftrVwWCECY3PLEcycFK4DN8tiIOQcZZ7zs56BODwxPqOPxtmQdBTiP1/PMeS0GI3fH8N+RQQkUXrTp66hWEwlGnt/yv2wiBDCG0fPTgzQGHm/A7eSaSw0PVqzl77BeGQc9ltvyxnUoBSh+zPDaizsIGGS56+mjUREKTKPi8blnHwQ1jdTy0HwvBSJ1xe/glEQKElyx6OyrWRUIRJzd8sFuJAUug8/y1oU3BRxqvu7mnEgNDVKq5O+zYRsGOpPZ88p3KgUmfMrx3I4+CRVht+rqpVMSC0mh4PK8aiAFM4nU8tGAMwUfccPu45ZFDBFYr+ftrVwWCECY3PLEcycFK4DN8tiIOQcZZ7zs56BODwxPqOPxtmQdBTiP1/PMeS0GI3fH8N+RQQkUXrTp66hWEwlGnt/yv2wiBDCG0fPTgzQGHm/A7eSaSw0PVqzl77BeGQc9ltvyxnUoBSh+zPDaizsIGGS56+mjUREKTKPi8blnHwQ1jdTy0HwvBSJ1xe/glEQKElyx6OyrWRUIRJzd8sFuJAUug8/y1oU3BRxqvu7mnEgNDVKq5O+zYRsGOpPZ88p3KgUmfMrx3I4+CRVht+rqpVMSC0mh4PK8aiAFM4nU8tGAMwUfccPu45ZFDBFYr+ftrVwWCECY3PLEcycFAAA=');
+            audio.play();
+        }
+
+        function toggleTimer() {
+            if (timerId === null) {
+                startBtn.textContent = '暂停';
+                status.textContent = isBreak ? '休息中' : '专注中';
+                // 将动画周期改为3秒，使番茄移动更慢
+                document.querySelector('.tomato').style.animation = 'bounce 3s infinite';
+                timerId = setInterval(() => {
+                    timeLeft--;
+                    updateDisplay();
+                    
+                    if (timeLeft === 0) {
+                        playSound();
+                        clearInterval(timerId);
+                        timerId = null;
+                        document.querySelector('.tomato').style.animation = 'bounce 2s infinite';
+                        
+                        if (!isBreak) {
+                            completedPomodoros++;
+                            stats.textContent = `今日完成：${completedPomodoros} 个番茄钟`;
+                            timeLeft = 5 * 60;
+                            isBreak = true;
+                            status.textContent = '休息时间到！';
+                        } else {
+                            timeLeft = parseInt(timeSelect.value) * 60;
+                            isBreak = false;
+                            status.textContent = '准备开始';
+                        }
+                        
+                        startBtn.textContent = '开始';
+                        updateDisplay();
+                    }
+                }, 1000);
+            } else {
+                clearInterval(timerId);
+                timerId = null;
+                startBtn.textContent = '开始';
+                status.textContent = '已暂停';
+                // 恢复到原来的2秒周期
+                document.querySelector('.tomato').style.animation = 'bounce 2s infinite';
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerId);
+            timerId = null;
+            timeLeft = parseInt(timeSelect.value) * 60;
+            isBreak = false;
+            startBtn.textContent = '开始';
+            status.textContent = '准备开始';
+            // 保持与初始状态一致
+            document.querySelector('.tomato').style.animation = 'bounce 2s infinite';
+            updateDisplay();
+        }
+
+        startBtn.addEventListener('click', toggleTimer);
+        resetBtn.addEventListener('click', resetTimer);
+        updateDisplay();
+    </script>
+</body>
+</html>
