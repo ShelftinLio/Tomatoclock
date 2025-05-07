@@ -150,6 +150,8 @@
         let timerId = null;
         let isBreak = false;
         let completedPomodoros = 0;
+        let lastUpdateTime = 0;
+        let isRunning = false;
 
         timeSelect.addEventListener('change', function() {
             if (timerId === null) {
@@ -171,41 +173,80 @@
             audio.play();
         }
 
+        // 使用 Page Visibility API 检测页面可见性变化
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden' && isRunning) {
+                // 页面隐藏时记录当前时间
+                lastUpdateTime = Date.now();
+                // 清除原有的 interval
+                clearInterval(timerId);
+                timerId = null;
+            } else if (document.visibilityState === 'visible' && isRunning) {
+                // 页面重新可见时，计算经过的时间并更新计时器
+                const now = Date.now();
+                const elapsedSeconds = Math.floor((now - lastUpdateTime) / 1000);
+                
+                if (elapsedSeconds > 0 && timeLeft > elapsedSeconds) {
+                    timeLeft -= elapsedSeconds;
+                } else if (timeLeft <= elapsedSeconds) {
+                    // 如果时间已经到了，触发结束逻辑
+                    timeLeft = 0;
+                    handleTimerEnd();
+                }
+                
+                // 重新启动 interval
+                startInterval();
+                updateDisplay();
+            }
+        });
+
+        function handleTimerEnd() {
+            playSound();
+            isRunning = false;
+            document.querySelector('.tomato').style.animation = 'bounce 2s infinite';
+            
+            if (!isBreak) {
+                completedPomodoros++;
+                stats.textContent = `今日完成：${completedPomodoros} 个番茄钟`;
+                timeLeft = 5 * 60;
+                isBreak = true;
+                status.textContent = '休息时间到！';
+            } else {
+                timeLeft = parseInt(timeSelect.value) * 60;
+                isBreak = false;
+                status.textContent = '准备开始';
+            }
+            
+            startBtn.textContent = '开始';
+            updateDisplay();
+        }
+
+        function startInterval() {
+            timerId = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+                
+                if (timeLeft === 0) {
+                    clearInterval(timerId);
+                    timerId = null;
+                    handleTimerEnd();
+                }
+            }, 1000);
+        }
+
         function toggleTimer() {
             if (timerId === null) {
                 startBtn.textContent = '暂停';
                 status.textContent = isBreak ? '休息中' : '专注中';
                 // 将动画周期改为3秒，使番茄移动更慢
                 document.querySelector('.tomato').style.animation = 'bounce 3s infinite';
-                timerId = setInterval(() => {
-                    timeLeft--;
-                    updateDisplay();
-                    
-                    if (timeLeft === 0) {
-                        playSound();
-                        clearInterval(timerId);
-                        timerId = null;
-                        document.querySelector('.tomato').style.animation = 'bounce 2s infinite';
-                        
-                        if (!isBreak) {
-                            completedPomodoros++;
-                            stats.textContent = `今日完成：${completedPomodoros} 个番茄钟`;
-                            timeLeft = 5 * 60;
-                            isBreak = true;
-                            status.textContent = '休息时间到！';
-                        } else {
-                            timeLeft = parseInt(timeSelect.value) * 60;
-                            isBreak = false;
-                            status.textContent = '准备开始';
-                        }
-                        
-                        startBtn.textContent = '开始';
-                        updateDisplay();
-                    }
-                }, 1000);
+                isRunning = true;
+                lastUpdateTime = Date.now();
+                startInterval();
             } else {
                 clearInterval(timerId);
                 timerId = null;
+                isRunning = false;
                 startBtn.textContent = '开始';
                 status.textContent = '已暂停';
                 // 恢复到原来的2秒周期
@@ -216,6 +257,7 @@
         function resetTimer() {
             clearInterval(timerId);
             timerId = null;
+            isRunning = false;
             timeLeft = parseInt(timeSelect.value) * 60;
             isBreak = false;
             startBtn.textContent = '开始';
