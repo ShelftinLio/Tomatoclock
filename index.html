@@ -147,14 +147,13 @@
         const timeSelect = document.getElementById('timeSelect');
 
         let timeLeft = 25 * 60;
-        let timerId = null;
         let isBreak = false;
         let completedPomodoros = 0;
-        let lastUpdateTime = 0;
         let isRunning = false;
+        const worker = new Worker('worker.js');
 
         timeSelect.addEventListener('change', function() {
-            if (timerId === null) {
+            if (!isRunning) {
                 const selectedMinutes = parseInt(this.value);
                 timeLeft = selectedMinutes * 60;
                 updateDisplay();
@@ -173,32 +172,71 @@
             audio.play();
         }
 
-        // 使用 Page Visibility API 检测页面可见性变化
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'hidden' && isRunning) {
-                // 页面隐藏时记录当前时间
-                lastUpdateTime = Date.now();
-                // 清除原有的 interval
-                clearInterval(timerId);
-                timerId = null;
-            } else if (document.visibilityState === 'visible' && isRunning) {
-                // 页面重新可见时，计算经过的时间并更新计时器
-                const now = Date.now();
-                const elapsedSeconds = Math.floor((now - lastUpdateTime) / 1000);
-                
-                if (elapsedSeconds > 0 && timeLeft > elapsedSeconds) {
-                    timeLeft -= elapsedSeconds;
-                } else if (timeLeft <= elapsedSeconds) {
-                    // 如果时间已经到了，触发结束逻辑
-                    timeLeft = 0;
-                    handleTimerEnd();
-                }
-                
-                // 重新启动 interval
-                startInterval();
+        worker.onmessage = function(e) {
+            const { type, timeLeft: newTimeLeft } = e.data;
+            if (type === 'tick') {
+                timeLeft = newTimeLeft;
                 updateDisplay();
+            } else if (type === 'end') {
+                handleTimerEnd();
+            }
+        };
+
+        function startTimer() {
+            isRunning = true;
+            status.textContent = isBreak ? '休息中...' : '专注中...';
+            startBtn.textContent = '暂停';
+            worker.postMessage({ command: 'start', value: timeLeft });
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            status.textContent = '已暂停';
+            startBtn.textContent = '继续';
+            worker.postMessage({ command: 'stop' });
+        }
+
+        function resetTimer() {
+            isRunning = false;
+            isBreak = false;
+            const selectedMinutes = parseInt(timeSelect.value);
+            timeLeft = selectedMinutes * 60;
+            status.textContent = '准备开始';
+            startBtn.textContent = '开始';
+            updateDisplay();
+            worker.postMessage({ command: 'reset', value: timeLeft });
+        }
+
+        function handleTimerEnd() {
+            playSound();
+            if (!isBreak) {
+                completedPomodoros++;
+                stats.textContent = `今日完成：${completedPomodoros} 个番茄钟`;
+                isBreak = true;
+                timeLeft = 5 * 60; // 5分钟休息
+                status.textContent = '休息一下！';
+            } else {
+                isBreak = false;
+                const selectedMinutes = parseInt(timeSelect.value);
+                timeLeft = selectedMinutes * 60;
+                status.textContent = '准备开始';
+            }
+            isRunning = false;
+            startBtn.textContent = '开始';
+            updateDisplay();
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
             }
         });
+
+        resetBtn.addEventListener('click', resetTimer);
+
+        updateDisplay();
 
         function handleTimerEnd() {
             playSound();
